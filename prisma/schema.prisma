@@ -1,0 +1,1314 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String                 @id @default(cuid())
+  email                 String                 @unique
+  name                  String
+  username              String?                @unique
+  phone                 String?
+  cpf                   String?                @unique
+  password              String
+  role                  String                 @default("user")
+  isActive              Boolean                @default(false)
+  plan                  String                 @default("free")
+  language              String                 @default("pt")
+  referralCode          String                 @unique
+  referredById          String?
+  entradaLevel          Int                    @default(0)
+  residualLevel         Int                    @default(0)
+  vendasLevel           Int                    @default(0)
+  balanceWithdrawal     Int                    @default(0)
+  balanceMobility       Int                    @default(0)
+  balanceShopping       Int                    @default(0)
+  balanceFood           Int                    @default(0)
+  balancePharmacy       Int                    @default(0)
+  balanceGratification  Int                    @default(0)
+  balancePaymentInvoice Int                    @default(0)
+  careerPoints          Int                    @default(0)
+  personalPoints        Int                    @default(0)
+  stars                 Int                    @default(0)
+  isDriver              Boolean                @default(false)
+  isDelivery            Boolean                @default(false)
+  // FK para a categoria do veículo do motorista (Safira, Rubi, Esmeralda,
+  // Diamante, Imperial). Null para não-motoristas. Migra o conceito de "pin"
+  // que antes vivia erradamente em CareerPlan.
+  driverCategoryId      String?
+  driverCategory        DriverCategory?        @relation(fields: [driverCategoryId], references: [id])
+  totalRides            Int                    @default(0)
+  profileImage          String?
+  address               String?
+  city                  String?
+  state                 String?
+  country               String?                @default("BR")
+  bankCode              String?
+  bankAgency            String?
+  bankAccount           String?
+  bankType              String?
+  pixKey                String?
+  pixEnabled            Boolean                @default(true)
+  // User opt-in to automatic monthly fee debit. When enabled, the system
+  // will attempt to deduct the monthly fee (R$999,90 for Premium 5) from
+  // the user's internal balances on the due date. If no balance is
+  // available, the user is prompted to transfer from another internal
+  // wallet (see My Plan page helper text).
+  autoDebitEnabled      Boolean                @default(false)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  balanceFree           Int                    @default(0)
+  balancePending        Int                    @default(0)
+  userType              String                 @default("usuario")
+  planId                String?
+  // Personal data fields
+  birthDate             DateTime?
+  rg                    String?
+  maritalStatus         String?
+  gender                String?
+  education             String?
+  zipCode               String?
+  sponsorId             String?
+  qualification         String?
+  // Emergency contact
+  emergencyName         String?
+  emergencyPhone        String?
+  emergencyRelation     String?
+  // Asaas payment gateway integration
+  asaasCustomerId       String?
+  asaasWalletId         String?
+  // KYC verification (Task 14-A / 16-A)
+  kycStatus             String?  // 'none' | 'pending' | 'approved' | 'rejected'
+  kycVerifiedAt         DateTime?
+  kycVerifiedById       String?
+  kycRejectedReason     String?
+  kycDocuments          KycDocument[]
+  auditLogs             AuditLog[]
+  telemedicinaRequests  TelemedicinaRequest[]
+  talkMobiSubscriptions TalkMobiSubscription[]
+  beneficiaries         Beneficiary[]
+  bets                  Bet[]
+  careerMilestones      CareerMilestone[]
+  cashbackEntries       CashbackEntry[]
+  cashbackResiduals     CashbackResidual[]
+  cashbackSales         CashbackSales[]
+  gamificationStreak    GamificationStreak?
+  gratifications        Gratification[]
+  invoices              Invoice[]
+  marketplaceOrders     MarketplaceOrder[]
+  marketplaceOrderItems MarketplaceOrderItem[]
+  marketplaceReviewsWritten   MarketplaceReview[]  @relation("MarketplaceReviewsWritten")
+  marketplaceReviewsReceived  MarketplaceReview[]  @relation("MarketplaceReviewsReceived")
+  marketplaceFavorites        MarketplaceFavorite[]
+  matrixPositions       MatrixPosition[]
+  notifications         Notification[]
+  pointTransactions     PointTransaction[]
+  tickets               Ticket[]
+  ticketMessages        TicketMessage[]
+  transactions          Transaction[]
+  Plan                  Plan?                  @relation(fields: [planId], references: [id])
+  referredBy            User?                  @relation("Referrals", fields: [referredById], references: [id])
+  referrals             User[]                 @relation("Referrals")
+  userChallenges        UserChallenge[]
+  vouchers              Voucher[]
+  withdrawalRequests    WithdrawalRequest[]
+  // ── App ecosystem relations (managed by /admingeral) ──
+  appStores             AppStore[]
+  appOrders             AppOrder[]
+  driverApplications    DriverApplication[]
+}
+
+model Bet {
+  id                  String    @id @default(cuid())
+  userId              String
+  eventId             String
+  eventLabel          String
+  selection           String
+  selectionLabel      String
+  odds                Float
+  amountInCents       Int
+  potentialWinInCents Int
+  status              String    @default("pending")
+  result              String?
+  settledAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  user                User      @relation(fields: [userId], references: [id])
+}
+
+model MatrixPosition {
+  id         String   @id @default(cuid())
+  userId     String
+  matrixType String
+  parentId   String?
+  level      Int      @default(0)
+  position   Int      @default(0)
+  isFilled   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model CashbackEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  fromUserId  String
+  amount      Int
+  level       Int
+  percentage  Float
+  description String?
+  // Lote 1 Item 1: chave de idempotência do motor de cashback
+  // (`<matriz>_<referenceId>` — ex.: `entrada_<orderId>`). Sem esta coluna o
+  // motor falha no create e não consegue detectar eventos duplicados.
+  referenceId String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model CashbackResidual {
+  id          String   @id @default(cuid())
+  userId      String
+  fromUserId  String
+  amount      Int
+  level       Int
+  percentage  Float
+  description String?
+  // Lote 1 Item 1: chave de idempotência do motor de cashback
+  // (`residual_<invoiceId>`). Garante que a mesma fatura paga nunca gere
+  // cashback duplicado, mesmo se o webhook chegar mais de uma vez.
+  referenceId String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model CashbackSales {
+  id          String   @id @default(cuid())
+  userId      String
+  fromUserId  String
+  amount      Int
+  level       Int
+  percentage  Float
+  category    String
+  description String?
+  // Lote 1 Item 1: chave de idempotência do motor de cashback
+  // (`vendas_<saleReferenceId>`).
+  referenceId String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String
+  amount      Int
+  status      String   @default("pending")
+  category    String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Invoice {
+  id              String    @id @default(cuid())
+  userId          String
+  amount          Int
+  type            String
+  status          String    @default("pending")
+  dueDate         DateTime
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id])
+  // Asaas payment integration fields
+  asaasPaymentId  String?
+  paymentMethod   String?   // 'pix' | 'boleto' | 'credit_card'
+  invoiceUrl      String?   // Asaas invoice URL
+  bankSlipUrl     String?   // Boleto PDF URL
+  pixCode         String?   // PIX copy-and-paste code
+  pixQrCode       String?   // PIX QR code image (base64 or URL)
+  description     String?
+}
+
+model Voucher {
+  id        String    @id @default(cuid())
+  userId    String
+  code      String    @unique
+  amount    Int
+  type      String
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model Ticket {
+  id        String          @id @default(cuid())
+  userId    String
+  subject   String
+  category  String
+  status    String          @default("open")
+  priority  String          @default("normal")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  user      User            @relation(fields: [userId], references: [id])
+  messages  TicketMessage[]
+}
+
+model TicketMessage {
+  id          String   @id @default(cuid())
+  ticketId    String
+  userId      String
+  message     String
+  isAdmin     Boolean  @default(false)
+  attachments String?
+  createdAt   DateTime @default(now())
+  ticket      Ticket   @relation(fields: [ticketId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model CareerMilestone {
+  id             String    @id @default(cuid())
+  userId         String
+  milestone      String
+  pointsRequired Int
+  achieved       Boolean   @default(false)
+  achievedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id])
+}
+
+model Gratification {
+  id           String    @id @default(cuid())
+  userId       String
+  type         String
+  amount       Int
+  category     String
+  description  String?
+  isClaimed    Boolean   @default(false)
+  claimedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  // New client-spec §5 fields for richer gratification tracking.
+  // - frequency: 'one_time' | 'monthly' | 'daily' (default 'one_time').
+  //   Only "Pagamento de Faturas" is recurring per client spec; everything
+  //   else is one-time. Kept as a free string so admins can introduce new
+  //   frequencies without a schema change.
+  // - qualification: human-readable qualification text (e.g. "Ao fechar o
+  //   5º nível", "6 meses de cadastro ativo"). Mirrors the client spec table.
+  // - targetValue: for goal-tracking gratifications (e.g. driver daily goal
+  //   = 18 rides). Null when not applicable.
+  // - currentValue: progress towards targetValue. Null when not applicable.
+  frequency    String?   
+  qualification String?  
+  targetValue  Int?      
+  currentValue Int?      
+  // Item 7 — Para qual tipo de usuário o benefício se aplica:
+  // 'motorista' | 'entregador' | 'ambos' | null (todos). Usado pelo módulo Metas.
+  targetQualification String?
+  user         User      @relation(fields: [userId], references: [id])
+}
+
+// ============================================================================
+// GoalConfig — Metas configuráveis pelo admin (Item: "permita o admin escolher
+// o tipo de usuário pra aquela meta, tipo motorista 20 viagens finalizadas
+// ganhar 5 reais")
+// ----------------------------------------------------------------------------
+// Cada linha representa UMA meta configurada pelo admin. Exemplos:
+//   - Motorista: 20 viagens finalizadas/dia → R$ 5,00 (gratification wallet)
+//   - Entregador: 15 entregas/dia → R$ 4,00 (gratification wallet)
+//   - Motorista: 100 viagens/mês → R$ 30,00 (withdrawal wallet)
+//   - Ambos: 500 corridas no total → R$ 50,00 (shopping wallet)
+//
+// O backoffice "Metas" lê essas configs e exibe para o usuário conforme sua
+// qualificação (targetQualification). O progresso (currentValue) é calculado
+// em runtime pela API /api/goal-configs baseado nasTransactions/Rides do user.
+// ============================================================================
+model GoalConfig {
+  id                   String   @id @default(cuid())
+  name                 String
+  description          String?
+  // Quem vê/qualifica para esta meta:
+  //   'motorista' | 'entregador' | 'ambos' | null (todos)
+  //   ou um código de UserType específico (ex: 'mototaxista')
+  targetQualification  String   @default("ambos")
+  // O que medir (código interno + rótulo humano):
+  //   metricCode: 'trips_daily' | 'trips_monthly' | 'deliveries_daily'
+  //               | 'deliveries_monthly' | 'trips_total' | 'sales_total'
+  //               | 'referrals_total' | 'kyc_approved' | 'custom'
+  //   metricLabel: rótulo exibido ao usuário, ex: "viagens finalizadas"
+  metricCode           String   @default("trips_daily")
+  metricLabel          String   @default("viagens finalizadas")
+  // Valor-alvo da meta (ex: 20 para "20 viagens")
+  targetValue          Int      @default(1)
+  // Recompensa (em centavos — ex: 500 = R$ 5,00)
+  rewardCents          Int      @default(0)
+  // Em qual carteira creditar a recompensa:
+  //   'gratification' | 'withdrawal' | 'shopping' | 'mobility' | 'food' | 'pharmacy'
+  rewardWallet         String   @default("gratification")
+  // Periodicidade: 'daily' | 'weekly' | 'monthly' | 'one_time'
+  frequency            String   @default("daily")
+  isActive             Boolean  @default(true)
+  sortOrder            Int      @default(99)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model PointTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Int
+  type        String
+  description String?
+  referenceId String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  category    String   @default("geral")
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================================================
+// UserType — Tipos de Usuário gerenciados pelo admin
+// ----------------------------------------------------------------------------
+// Permite que o admin crie/edite/delete tipos de usuário dinamicamente
+// (ex: Motorista, Passageiro, Passageiro 60+, Comércio, Entregador, Lojista,
+// etc.) sem precisar mexer no código. Cada tipo carrega:
+//   - defaultEntradaLevel/Residual/Vendas: níveis padrão de matriz aplicados
+//     quando o admin cria um usuário desse tipo.
+//   - showDriverGoals: se true, usuários desse tipo veem o card "Metas" no
+//     backoffice (item 7 — visível só para motorista/entregador).
+//   - mobilePermissions: JSON array de feature keys que o tipo pode acessar
+//     no futuro app mobile (/mobile/login, /mobile/inicio). Ex:
+//     ["dashboard","wallet","ride_request","store","cashback","career"].
+//   - color/icon: opcionais para badges visuais.
+//
+// O User.qualification continua sendo uma String livre — quando o admin
+// seleciona um UserType, o código desse tipo é gravado em User.qualification
+// e os níveis padrão são aplicados a User.entradaLevel/residualLevel/vendasLevel.
+// ============================================================================
+model UserType {
+  id                   String   @id @default(cuid())
+  code                 String   @unique
+  label                String
+  description          String?
+  isActive             Boolean  @default(true)
+  sortOrder            Int      @default(99)
+  // Default matrix levels for users of this type (admin can override per-user)
+  defaultEntradaLevel  Int      @default(0)
+  defaultResidualLevel Int      @default(0)
+  defaultVendasLevel   Int      @default(0)
+  // Whether users of this type should see the "Metas" driver-goals card
+  showDriverGoals      Boolean  @default(false)
+  // Mobile app permissions — JSON array of feature keys this type can access
+  // in the upcoming /mobile/* app (e.g. ["dashboard","wallet","ride","store"])
+  mobilePermissions    String   @default("[]")
+  // Optional visual: hex color + emoji icon for badges
+  color                String?
+  icon                 String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model WithdrawalRequest {
+  id              String    @id @default(cuid())
+  userId          String
+  amount          Int                          // in cents
+  status          String    @default("pending") // pending | approved | rejected | paid | failed
+  paymentMethod   String    @default("pix")      // pix | bank_transfer
+  pixKey          String?
+  bankCode        String?
+  bankAgency      String?
+  bankAccount     String?
+  bankType        String?
+  asaasTransferId String?
+  asaasStatus     String?                       // status returned by Asaas transfer API
+  rejectedReason  String?
+  processedById   String?                       // admin who approved/rejected
+  processedAt     DateTime?
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id])
+}
+
+model AsaasWebhookEvent {
+  id           String   @id @default(cuid())
+  eventId      String   @unique                // Asaas event id (idempotency)
+  event        String                          // e.g. PAYMENT_RECEIVED, PAYMENT_OVERDUE
+  paymentId    String?
+  status       String?
+  payload      String                          // raw JSON payload
+  processed    Boolean  @default(false)
+  processedAt  DateTime?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  message     String
+  type        String    @default("info")
+  priority    String    @default("normal")
+  isActive    Boolean   @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  actionLabel String?
+  actionUrl   String?
+  createdBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model GamificationStreak {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  lastLoginDate DateTime?
+  totalPoints   Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id])
+}
+
+model Challenge {
+  id             String          @id @default(cuid())
+  title          String
+  description    String
+  type           String
+  targetValue    Int
+  rewardPoints   Int
+  isActive       Boolean         @default(true)
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  userChallenges UserChallenge[]
+}
+
+model UserChallenge {
+  id           String    @id @default(cuid())
+  userId       String
+  challengeId  String
+  currentValue Int       @default(0)
+  completed    Boolean   @default(false)
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  challenge    Challenge @relation(fields: [challengeId], references: [id])
+  user         User      @relation(fields: [userId], references: [id])
+}
+
+model Event {
+  id            String              @id @default(cuid())
+  title         String
+  description   String
+  type          String
+  status        String              @default("upcoming")
+  eventDate     DateTime
+  endDate       DateTime?
+  location      String?
+  meetingUrl    String?
+  maxAttendees  Int?
+  imageUrl      String?
+  isActive      Boolean             @default(true)
+  createdBy     String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  registrations EventRegistration[]
+}
+
+model EventRegistration {
+  id           String   @id @default(cuid())
+  eventId      String
+  userId       String
+  registeredAt DateTime @default(now())
+  event        Event    @relation(fields: [eventId], references: [id])
+
+  @@unique([eventId, userId])
+}
+
+model Beneficiary {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  cpf          String?
+  relationship String
+  percentage   Int
+  age          Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model MarketplaceProduct {
+  id              String                 @id @default(cuid())
+  name            String
+  description     String?
+  price           Int
+  originalPrice   Int?
+  category        String
+  imageUrl        String?
+  images          String? // JSON array of up to 15 photo URLs (String)
+  specifications  String? // JSON object of tech attrs (Marca, Modelo, Peso, Dimensões, Garantia, Condição, etc.)
+  stock           Int                    @default(0)
+  isActive        Boolean                @default(true)
+  isFeatured      Boolean                @default(false)
+  cashbackPercent Float                  @default(0)
+  rating          Float                  @default(0)
+  reviewCount     Int                    @default(0)
+  sellerName      String?
+  tags            String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  orderItems      MarketplaceOrderItem[]
+  reviews         MarketplaceReview[]
+  favorites       MarketplaceFavorite[]
+}
+
+model MarketplaceOrder {
+  id              String                 @id @default(cuid())
+  userId          String
+  status          String                 @default("pending")
+  totalAmount     Int
+  cashbackEarned  Int                    @default(0)
+  shippingAddress String?
+  paymentMethod   String?
+  paidAt          DateTime?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  user            User                   @relation(fields: [userId], references: [id])
+  items           MarketplaceOrderItem[]
+}
+
+model MarketplaceOrderItem {
+  id              String             @id @default(cuid())
+  orderId         String
+  productId       String
+  userId          String
+  productName     String
+  quantity        Int                @default(1)
+  unitPrice       Int
+  cashbackPercent Float              @default(0)
+  createdAt       DateTime           @default(now())
+  order           MarketplaceOrder   @relation(fields: [orderId], references: [id])
+  product         MarketplaceProduct @relation(fields: [productId], references: [id])
+  user            User               @relation(fields: [userId], references: [id])
+}
+
+// ── MarketplaceReview ─────────────────────────────────────────────────────────
+// Bidirectional review between buyer and seller for a single order.
+//   direction = "buyer_to_seller" → reviewer = buyer, reviewee = seller
+//   direction = "seller_to_buyer" → reviewer = seller, reviewee = buyer
+// The @@unique([orderId, direction]) constraint guarantees each direction can
+// only be reviewed once per order (i.e. buyer can only rate seller once per
+// order, and vice versa). productId is denormalised so we can list reviews for
+// a product without joining through order items.
+model MarketplaceReview {
+  id          String   @id @default(cuid())
+  productId   String
+  orderId     String
+  reviewerId  String
+  revieweeId  String
+  // "buyer_to_seller" | "seller_to_buyer"
+  direction   String
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product     MarketplaceProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reviewer    User               @relation("MarketplaceReviewsWritten", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee    User               @relation("MarketplaceReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, direction])
+  @@index([productId])
+  @@index([revieweeId])
+  @@index([reviewerId])
+}
+
+// ── MarketplaceFavorite ───────────────────────────────────────────────────────
+// Wishlist / favorited products per user. Toggled via POST /api/marketplace/favorites.
+// @@unique([userId, productId]) guarantees a user can only favorite a product once.
+model MarketplaceFavorite {
+  id          String   @id @default(cuid())
+  userId      String
+  productId   String
+  createdAt   DateTime @default(now())
+
+  product     MarketplaceProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+model Plan {
+  id                                           String      @id
+  code                                         String      @unique
+  name                                         String
+  priceCents                                   Int         @default(0)
+  description                                  String?
+  features                                     String      @default("[]")
+  isActive                                     Boolean     @default(true)
+  isDefault                                    Boolean     @default(false)
+  sortOrder                                    Int         @default(0)
+  matrixEntradaId                              String?
+  matrixResidualId                             String?
+  matrixVendasId                               String?
+  createdAt                                    DateTime    @default(now())
+  updatedAt                                    DateTime    @updatedAt
+  MatrixType_Plan_matrixEntradaIdToMatrixType  MatrixType? @relation("Plan_matrixEntradaIdToMatrixType", fields: [matrixEntradaId], references: [id])
+  MatrixType_Plan_matrixResidualIdToMatrixType MatrixType? @relation("Plan_matrixResidualIdToMatrixType", fields: [matrixResidualId], references: [id])
+  MatrixType_Plan_matrixVendasIdToMatrixType   MatrixType? @relation("Plan_matrixVendasIdToMatrixType", fields: [matrixVendasId], references: [id])
+  User                                         User[]
+}
+
+model AccreditedNetworkItem {
+  id              String   @id
+  name            String
+  category        String   @default("posto")
+  brand           String?
+  city            String
+  state           String
+  address         String?
+  phone           String?
+  discountText    String?
+  cashbackPercent Float    @default(0)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+
+  @@index([brand])
+  @@index([category])
+  @@index([state])
+}
+
+model DiscountClubPartner {
+  id              String   @id
+  name            String
+  logoUrl         String?
+  category        String   @default("geral")
+  discountText    String?
+  cashbackPercent Float    @default(0)
+  description     String?
+  websiteUrl      String?
+  phone           String?
+  isActive        Boolean  @default(true)
+  isFeatured      Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+}
+
+model MatrixLevelEarning {
+  id              String     @id @default(cuid())
+  matrixTypeId    String
+  level           Int
+  percentage      Float      @default(0)
+  fixedBonusCents Int        @default(0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime
+  MatrixType      MatrixType @relation(fields: [matrixTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([matrixTypeId, level])
+}
+
+model MatrixType {
+  id                                     String               @id
+  code                                   String               @unique
+  name                                   String
+  matrixKind                             String
+  width                                  Int                  @default(4)
+  depth                                  Int                  @default(5)
+  description                            String?
+  color                                  String?
+  isActive                               Boolean              @default(true)
+  createdAt                              DateTime             @default(now())
+  updatedAt                              DateTime
+  MatrixLevelEarning                     MatrixLevelEarning[]
+  Plan_Plan_matrixEntradaIdToMatrixType  Plan[]               @relation("Plan_matrixEntradaIdToMatrixType")
+  Plan_Plan_matrixResidualIdToMatrixType Plan[]               @relation("Plan_matrixResidualIdToMatrixType")
+  Plan_Plan_matrixVendasIdToMatrixType   Plan[]               @relation("Plan_matrixVendasIdToMatrixType")
+}
+
+model TalkMobiPlan {
+  id            String   @id
+  name          String
+  dataAmount    String
+  priceCents    Int
+  cashbackCents Int      @default(0)
+  rewardPoints  Int      @default(0)
+  description   String?
+  features      String   @default("[]")
+  isPopular     Boolean  @default(false)
+  isRecommended Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  icon        String?
+  category    String   @default("general")
+  pointsReward Int     @default(0)
+  targetValue Int      @default(1)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CareerPlan {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  description  String?
+  // Pontos mínimos para desbloquear esta graduação (único, obrigatório)
+  minPoints    Int      @default(0)
+  // 9.1 — Recompensa em CARTEIRA SAQUE (R$ em cents). 0 = sem recompensa nesta carteira.
+  rewardWithdrawalCents Int @default(0)
+  // 9.2 — Recompensa em CARTEIRA COMPRAS (R$ em cents). 0 = sem recompensa nesta carteira.
+  rewardShoppingCents   Int @default(0)
+  // 9.3 — Recompensa em PONTOS. 0 = sem recompensa em pontos.
+  rewardPoints          Int @default(0)
+  // 9.4 — Texto livre da gratificação (bônus descritivo que aparece no card).
+  gratification         String?
+  // Legado: mantido para compatibilidade (migrado para rewardWithdrawalCents quando > 0).
+  bonusCents   Int      @default(0)
+  rewardType   String   @default("real")
+  color        String?
+  icon         String?
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model StreakReward {
+  id           String   @id @default(cuid())
+  streakDays   Int
+  rewardType   String   @default("points")
+  rewardAmount Int      @default(0)
+  description  String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([streakDays])
+}
+
+model FAQ {
+  id          String   @id @default(cuid())
+  question    String
+  answer      String
+  category    String   @default("geral")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model GameConfig {
+  id              String   @id @default(cuid())
+  gameCode        String   @unique
+  name            String
+  description     String?
+  pointsPerWin    Int      @default(10)
+  pointsPerPlay   Int      @default(1)
+  cashbackPerWin  Int      @default(0)
+  minBetCents     Int      @default(0)
+  maxPlaysPerDay  Int      @default(10)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KYC document uploads (Task 14-A / 16-A)
+// A user uploads 5 documents (CNH frente/verso, RG frente/verso, comprovante).
+// Admin reviews and approves/rejects. Account is blocked from withdrawals,
+// cashback claims, and plan upgrades until kycStatus === 'approved'.
+// ─────────────────────────────────────────────────────────────────────────────
+model KycDocument {
+  id          String   @id @default(cuid())
+  userId      String
+  docType     String   // 'cnh_front' | 'cnh_back' | 'rg_front' | 'rg_back' | 'proof_of_address'
+  fileUrl     String
+  fileName    String?
+  fileSize    Int?
+  mimeType    String?
+  status      String   @default("pending") // 'pending' | 'approved' | 'rejected'
+  reviewedById String?
+  reviewedAt  DateTime?
+  rejectReason String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, docType])
+  @@index([userId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit log (Task 14-D)
+// Records admin actions for compliance: who did what, when, from where.
+// ─────────────────────────────────────────────────────────────────────────────
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?  // admin who performed the action
+  action      String   // e.g. 'user.edit', 'kyc.approve', 'withdrawal.approve'
+  entityType  String?  // 'User', 'Invoice', 'WithdrawalRequest', etc.
+  entityId    String?
+  details     String?  // JSON string with before/after or extra context
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Telemedicina activation requests
+// Users who want to activate the Telemedicina service submit a request with
+// their personal info + dependents. Admin reviews and either approves (then
+// sends activation instructions: link/code/credentials) or rejects with notes.
+// ─────────────────────────────────────────────────────────────────────────────
+model TelemedicinaRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  // Holder (titular) info captured at request time
+  fullName        String
+  cpf             String
+  birthDate       String?
+  phone           String
+  email           String
+  // JSON array of dependents: [{ name, kinship, birthDate, cpf? }]
+  dependents      String   @default("[]")
+  // Optional medical notes the user wants the admin/provider to know
+  notes           String?
+  // Status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  status          String   @default("pending")
+  // Admin fields (filled on approval / rejection)
+  adminNotes      String?
+  activationLink  String?  // link/code sent to the user when approved
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Subscription requests for TalkMobi mobile plans.
+/// Mirrors the TelemedicinaRequest approval flow: a user picks a plan,
+/// an admin reviews the request in the admin panel and approves / rejects it.
+/// On approval, the admin can attach an activation link / SIM ICCID / instructions.
+model TalkMobiSubscription {
+  id              String   @id @default(cuid())
+  userId          String
+  // Snapshot of the plan the user requested, in case the plan is later edited
+  // or deleted by the admin. We never look up TalkMobiPlan at request time.
+  planId          String
+  planName        String
+  dataAmount      String
+  priceCents      Int
+  cashbackCents   Int      @default(0)
+  rewardPoints    Int      @default(0)
+  // Holder (titular) info captured at request time, may differ from account
+  fullName        String
+  cpf             String
+  birthDate       String?
+  phone           String
+  email           String
+  // Shipping address for the SIM chip (optional — digital plans may skip it)
+  zipCode         String?
+  street          String?
+  number          String?
+  complement      String?
+  district        String?
+  city            String?
+  state           String?
+  // Free-form notes from the user (e.g. preferred activation date)
+  notes           String?
+  // Status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  status          String   @default("pending")
+  // Admin fields (filled on approval / rejection)
+  adminNotes      String?
+  activationLink  String?  // SIM ICCID, eSIM QR link, or activation URL sent to user
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([planId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// APP ECOSYSTEM MODELS — managed by the /admingeral panel
+// ----------------------------------------------------------------------------
+// These models power the /mobile, /motorista, /lojista (and future /prestador)
+// apps. They are SEPARATE from the MMN/admin models above so the app-side
+// administration is fully isolated from the network-marketing backoffice.
+// ============================================================================
+
+// ── AppCategory ──────────────────────────────────────────────────────────────
+// Top-level categories shown on the /mobile home grid (Shopping, Alimentação,
+// Mercado, MediDrop, etc.) and used to classify stores + products.
+model AppCategory {
+  id          String   @id @default(cuid())
+  code        String   @unique // "shopping", "alimentacao", "mercado"...
+  label       String
+  description String?
+  icon        String?  // lucide icon name or emoji
+  color       String?  // hex accent color
+  sortOrder   Int      @default(99)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stores    AppStore[]
+  products  AppProduct[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+// ── AppStore ─────────────────────────────────────────────────────────────────
+// A merchant store (lojista). Owned by a User with userType='lojista' or
+// isDelivery=true. One user can own multiple stores.
+model AppStore {
+  id           String   @id @default(cuid())
+  ownerId      String
+  name         String
+  slug         String   @unique
+  category     String   @default("alimentacao") // AppCategory.code
+  description  String?
+  logoUrl      String?
+  coverUrl     String?
+  phone        String?
+  email        String?
+  // Address
+  address      String?
+  city         String?
+  state        String?
+  zipCode      String?
+  lat          Float?
+  lng          Float?
+  // Business
+  rating       Float    @default(0)
+  totalOrders  Int      @default(0)
+  totalRevenue Int      @default(0) // cents
+  // Status
+  isVerified   Boolean  @default(false)
+  isOpen       Boolean  @default(true) // manual toggle by owner
+  isFeatured   Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  // Delivery
+  deliveryFeeCents Int  @default(0)
+  minOrderCents    Int  @default(0)
+  estimatedDeliveryMin Int @default(30)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  categoryRel AppCategory?   @relation(fields: [category], references: [code])
+  products    AppProduct[]
+  orders      AppOrder[]
+
+  @@index([ownerId])
+  @@index([category])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([city])
+}
+
+// ── AppProduct ───────────────────────────────────────────────────────────────
+// A product/menu-item sold by a store.
+model AppProduct {
+  id           String   @id @default(cuid())
+  storeId      String
+  name         String
+  description  String?
+  priceCents   Int
+  oldPriceCents Int? // for showing a discount
+  imageUrl     String?
+  images       String? // JSON array of up to 15 photo URLs (String)
+  specifications String? // JSON object of tech attrs (Marca, Modelo, Peso, Dimensões, Garantia, Condição, etc.)
+  category     String? // sub-category within the store (e.g. "Burgers", "Pizzas")
+  categoryCode String?  // AppCategory.code for cross-store filtering
+  // Inventory
+  stock        Int      @default(-1) // -1 = unlimited
+  // Flags
+  isAvailable  Boolean  @default(true)
+  isFeatured   Boolean  @default(false)
+  sortOrder    Int      @default(99)
+  // Nutrition / extras
+  calories     Int?
+  preparationTimeMin Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store       AppStore     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  categoryRel AppCategory? @relation(fields: [categoryCode], references: [code])
+  orderItems  AppOrderItem[]
+
+  @@index([storeId])
+  @@index([categoryCode])
+  @@index([isFeatured])
+  @@index([isAvailable])
+}
+
+// ── AppOrder ─────────────────────────────────────────────────────────────────
+// An order placed by a cliente at a lojista store.
+model AppOrder {
+  id            String   @id @default(cuid())
+  number        String   @unique // human-readable "#4582"
+  storeId       String
+  customerId    String
+  // Status: pending | preparo | entrega | entregue | cancelado
+  status        String   @default("pending")
+  // Totals (cents)
+  subtotalCents Int
+  deliveryFeeCents Int   @default(0)
+  totalCents    Int
+  // Cashback credited to the customer (cents)
+  cashbackCents Int      @default(0)
+  // Delivery
+  deliveryAddress String?
+  deliveryCity  String?
+  deliveryState String?
+  deliveryZipCode String?
+  // Payment
+  paymentMethod String   @default("pix") // pix | credit | cash
+  paymentStatus String   @default("pending") // pending | paid | refunded
+  // Notes
+  customerNotes String?
+  adminNotes    String?
+  // Timestamps
+  acceptedAt    DateTime?
+  preparingAt   DateTime?
+  dispatchedAt  DateTime?
+  deliveredAt   DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store     AppStore       @relation(fields: [storeId], references: [id])
+  customer  User           @relation(fields: [customerId], references: [id])
+  items     AppOrderItem[]
+
+  @@index([storeId])
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ── AppOrderItem ─────────────────────────────────────────────────────────────
+model AppOrderItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  productId    String
+  productName  String
+  quantity     Int      @default(1)
+  unitPriceCents Int
+  totalCents   Int
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  order   AppOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product AppProduct @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// ── MobileBanner ─────────────────────────────────────────────────────────────
+// Promotional banners shown on the /mobile home carousel.
+model MobileBanner {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String?
+  ctaLabel    String?
+  ctaHref     String?
+  imageUrl    String?
+  accentColor String   @default("#155EEF")
+  sortOrder   Int      @default(99)
+  isActive    Boolean  @default(true)
+  // Targeting — which app surface to show on
+  surface     String   @default("mobile") // mobile | motorista | lojista
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([surface])
+  @@index([sortOrder])
+}
+
+// ── DriverApplication ────────────────────────────────────────────────────────
+// ============================================================================
+// DriverCategory — Categorias de Veículo do Motorista (Safira → Imperial)
+// ----------------------------------------------------------------------------
+// Representa a categoria/qualidade do veículo do motorista, do mais básico
+// (Safira) até o topo (Imperial). Cada categoria tem:
+//   - monthlyTripsTarget: meta mensal de corridas (ex: 500)
+//   - bonusCents: bônus pago SE o motorista bater a meta no mês
+//   - maxCancellationPerMonth: limite de cancelamentos (0 = idoso/tolerância
+//     zero, 2 = demais categorias — editável por categoria)
+//
+// O bônus NÃO é fixo mensal — só é pago quando a meta de corridas é batida.
+// O motorista é associado via User.driverCategoryId.
+//
+// Separa do CareerPlan (que continua sendo graduação por careerPoints).
+// ============================================================================
+model DriverCategory {
+  id                      String   @id @default(cuid())
+  code                    String   @unique // safira | rubi | esmeralda | diamante | imperial
+  name                    String           // "Safira", "Rubi", ...
+  description             String?
+  sortOrder               Int      @default(0)
+  monthlyTripsTarget      Int      @default(0)  // meta mensal de corridas
+  bonusCents              Int      @default(0)  // bônus em centavos se bater a meta
+  maxCancellationPerMonth Int      @default(2)  // 0 = tolerância zero (idoso), 2 = demais
+  color                   String?
+  icon                    String?
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  // Relação reversa — motoristas nesta categoria
+  users                   User[]
+}
+
+// A user's application to become a driver (motorista). Admin approves/rejects
+// in /admingeral. On approval, sets User.isDriver=true.
+model DriverApplication {
+  id            String   @id @default(cuid())
+  userId        String
+  // Vehicle info
+  vehicleType   String   @default("car") // car | moto | utilitario
+  vehicleModel  String?
+  vehiclePlate  String?
+  vehicleColor  String?
+  vehicleYear   Int?
+  // Documents (CNH, CRLV, etc.) — stored as JSON array of URLs
+  documents     String   @default("[]")
+  // Background check
+  cnhNumber     String?
+  cnhCategory   String?  // A | B | C | D | E
+  // Status: pending | approved | rejected | reSubmitted
+  status        String   @default("pending")
+  adminNotes    String?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  rejectedReason String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// ServiceType — Tipos/Categorias de Serviço gerenciados pelo admin
+// ----------------------------------------------------------------------------
+// Substitui a lista hardcoded de 7 categorias + "Outros" no módulo de
+// Serviços. O admin cria/edita/desativa tipos livremente; o módulo de
+// Serviços consome /api/service-types para popular o dropdown e os chips
+// de filtro. `icon` é um emoji livre (ex: "🚙", "🔧"). `isActive=false`
+// esconde o tipo do dropdown público mas mantém registros históricos.
+//
+// Item 8 — fotos + admin CRUD de Tipos de Serviço.
+// ============================================================================
+model ServiceType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  icon      String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(99)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================================================
+// Service — anúncio de serviço criado por um usuário (lojista/motorista).
+// ----------------------------------------------------------------------------
+// `photos` é uma string JSON contendo um array de URLs/data URLs de fotos
+// enviadas pelo usuário ao criar o serviço (Item 8). Cada item até 5 fotos.
+// `category` continua sendo o nome (string) do ServiceType — guardamos o
+// nome em vez do id para que o histórico continue legível mesmo se o tipo
+// for renomeado/excluído depois.
+// ============================================================================
+model Service {
+  id           String   @id @default(cuid())
+  providerId   String
+  providerName String
+  name         String
+  description  String?
+  category     String
+  price        Int      @default(0) // in cents
+  location     String?
+  phone        String?
+  photos       String   @default("[]") // JSON array of photo URLs/data URLs
+  isAvailable  Boolean  @default(true)
+  rating       Int      @default(0)
+  reviewCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([category])
+  @@index([createdAt])
+}
